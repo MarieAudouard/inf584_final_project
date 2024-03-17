@@ -76,9 +76,22 @@ void Rasterizer::loadShaderProgram(const std::string &basePath)
 	try
 	{
 		std::string shaderPath = basePath + "/" + SHADER_PATH;
-		m_DisplayZBufferShaderProgramPtr = ShaderProgram::genBasicShaderProgram(shaderPath + "/DisplayZBufferVertexShader.glsl",
+		m_DisplayZBufferShaderProgramPtr = ShaderProgram::genBasicShaderProgram(shaderPath + "/DisplayVertexShader.glsl",
 																										shaderPath + "/DisplayZBufferFragmentShader.glsl");
 		m_DisplayZBufferShaderProgramPtr->set("imageTexZ", 0);
+	}
+	catch (std::exception &e)
+	{
+		exitOnCriticalError(std::string("[Error loading display shader program]") + e.what());
+	}
+	m_AmbientOcclusionShaderProgramPtr.reset();
+	try
+	{
+		std::string shaderPath = basePath + "/" + SHADER_PATH;
+		m_AmbientOcclusionShaderProgramPtr = ShaderProgram::genBasicShaderProgram(shaderPath + "/DisplayVertexShader.glsl",
+																										  shaderPath + "/AmbientOcclusionFragmentShader.glsl");
+		m_AmbientOcclusionShaderProgramPtr->set("imageTexZ", 0);
+		m_AmbientOcclusionShaderProgramPtr->set("imageTexNormal", 1);
 	}
 	catch (std::exception &e)
 	{
@@ -117,8 +130,9 @@ void Rasterizer::initDisplayedImage()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	// Creating the framebuffer that will contain the depth to display
+	// Creating the framebuffer that will contain the depth & normal
 	glBindFramebuffer(GL_FRAMEBUFFER, ssaoFramebufferID);
+	// Creating the depth texture
 	glGenTextures(1, &ssaoDepthTextureID);
 	glBindTexture(GL_TEXTURE_2D, ssaoDepthTextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
@@ -129,12 +143,25 @@ void Rasterizer::initDisplayedImage()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, ssaoDepthTextureID, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// Creating the normal texture
+	glGenTextures(1, &ssaoNormalTextureID);
+	glBindTexture(GL_TEXTURE_2D, ssaoNormalTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, ssaoNormalTextureID, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 // The main rendering call
 void Rasterizer::render(std::shared_ptr<Scene> scenePtr)
 {
+	m_pbrShaderProgramPtr->use();
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	const glm::vec3 &bgColor = scenePtr->backgroundColor();
 	glClearColor(bgColor[0], bgColor[1], bgColor[2], 1.f);
@@ -186,20 +213,15 @@ void Rasterizer::display(std::shared_ptr<Image> imagePtr)
 	m_displayShaderProgramPtr->stop();
 }
 
-void Rasterizer::displayZBuffer(std::shared_ptr<Scene> scenePtr)
+void Rasterizer::computeZBuffer(std::shared_ptr<Scene> scenePtr)
 {
 	// fill the Z buffer
 	m_ZBufferShaderProgramPtr->use(); // Activate the program to be used for upcoming primitive
 	glBindFramebuffer(GL_FRAMEBUFFER, ssaoFramebufferID);
-	glDrawBuffer(GL_NONE);
+	GLenum drawBuffers[] = {GL_NONE, GL_COLOR_ATTACHMENT1};
+	glDrawBuffers(2, drawBuffers);
 	glReadBuffer(GL_NONE);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	m_ZBufferShaderProgramPtr->set("near", scenePtr->camera()->getNear());
-	m_ZBufferShaderProgramPtr->set("far", scenePtr->camera()->getFar());
-	m_ZBufferShaderProgramPtr->set("aspectRatio", scenePtr->camera()->getAspectRatio());
-	m_ZBufferShaderProgramPtr->set("width", m_width);
-	m_ZBufferShaderProgramPtr->set("height", m_height);
 
 	size_t numOfMeshes = scenePtr->numOfMeshes();
 	for (size_t i = 0; i < numOfMeshes; i++)
@@ -209,10 +231,17 @@ void Rasterizer::displayZBuffer(std::shared_ptr<Scene> scenePtr)
 		glm::mat4 modelMatrix = scenePtr->mesh(i)->computeTransformMatrix();
 		glm::mat4 viewMatrix = scenePtr->camera()->computeViewMatrix();
 		glm::mat4 modelViewMatrix = viewMatrix * modelMatrix;
+		glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelViewMatrix));
 		m_ZBufferShaderProgramPtr->set("modelViewMat", modelViewMatrix);
+		m_ZBufferShaderProgramPtr->set("normalMat", normalMatrix);
 		draw(i, scenePtr->mesh(i)->triangleIndices().size());
 	}
 	m_ZBufferShaderProgramPtr->stop();
+}
+
+void Rasterizer::displayZBuffer(std::shared_ptr<Scene> scenePtr)
+{
+	computeZBuffer(scenePtr);
 
 	// Switch to the default framebuffer for displaying the Z-buffer
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -226,6 +255,49 @@ void Rasterizer::displayZBuffer(std::shared_ptr<Scene> scenePtr)
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
 	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
 	m_DisplayZBufferShaderProgramPtr->stop();
+}
+
+void Rasterizer::displayNormal(std::shared_ptr<Scene> scenePtr)
+{
+	computeZBuffer(scenePtr);
+
+	// Switch to the default framebuffer for displaying the Z-buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// display the normals
+	m_displayShaderProgramPtr->use(); // Activate the program to be used for upcoming primitive
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, ssaoNormalTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
+	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
+	m_displayShaderProgramPtr->stop();
+}
+
+void Rasterizer::displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr)
+{
+	computeZBuffer(scenePtr);
+
+	// Switch to the default framebuffer for displaying the Z-buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// display the Z buffer
+	m_AmbientOcclusionShaderProgramPtr->use(); // Activate the program to be used for upcoming primitive
+	m_AmbientOcclusionShaderProgramPtr->set("aspectRatio", scenePtr->camera()->getAspectRatio());
+	m_AmbientOcclusionShaderProgramPtr->set("width", m_width);
+	m_AmbientOcclusionShaderProgramPtr->set("height", m_height);
+	m_AmbientOcclusionShaderProgramPtr->set("fov", scenePtr->camera()->getFoV());
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, ssaoDepthTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0); // adapt to the size of the window
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, ssaoNormalTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
+	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
+	m_AmbientOcclusionShaderProgramPtr->stop();
 }
 
 void Rasterizer::clear()

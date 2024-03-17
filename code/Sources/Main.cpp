@@ -61,14 +61,22 @@ static std::string basePath;
 static std::string meshFilename;
 
 // Raytraced rendering
-static bool isDisplayRaytracing(false);
-static bool isDisplayZBuffer(false);
+enum DisplayMode
+{
+	Rasterization,
+	Raytracing,
+	ZBuffer,
+	Normal,
+	AmbientOcclusion
+};
+
+static DisplayMode displayMode = Rasterization;
 
 void clear();
 
 void printHelp()
 {
-	Console::print(std::string("Help:\n") + "\tMouse commands:\n" + "\t* Left button: rotate camera\n" + "\t* Middle button: zoom\n" + "\t* Right button: pan camera\n" + "\tKeyboard commands:\n" + "\t* ESC: quit the program\n" + "\t* H: print this help\n" + "\t* F12: reload GPU shaders\n" + "\t* F: decrease field of view\n" + "\t* G: increase field of view\n" + "\t* TAB: switch between rasterization and ray tracing display\n" + "\t* SPACE: execute ray tracing\n");
+	Console::print(std::string("Help:\n") + "\tMouse commands:\n" + "\t* Left button: rotate camera\n" + "\t* Middle button: zoom\n" + "\t* Right button: pan camera\n" + "\tKeyboard commands:\n" + "\t* ESC: quit the program\n" + "\t* H: print this help\n" + "\t* F12: reload GPU shaders\n" + "\t* F: decrease field of view\n" + "\t* G: increase field of view\n" + "\t* TAB: switch between rasterization, ray tracing, Zbuffer, normal display and ambient occlusion\n" + "\t* SPACE: execute ray tracing\n");
 }
 
 /// Adjust the ray tracer target resolution and runs it.
@@ -107,21 +115,30 @@ void keyCallback(GLFWwindow *windowPtr, int key, int scancode, int action, int m
 		}
 		else if (action == GLFW_PRESS && key == GLFW_KEY_TAB)
 		{
-			if (!isDisplayRaytracing && !isDisplayZBuffer)
+			if (displayMode == Rasterization)
 			{
-				std::cout << "Displaying raytracing" << std::endl;
-				isDisplayRaytracing = true;
+				displayMode = Raytracing;
+				std::cout << "Display mode: Raytracing" << std::endl;
 			}
-			else if (isDisplayRaytracing)
+			else if (displayMode == Raytracing)
 			{
-				std::cout << "Displaying z-buffer" << std::endl;
-				isDisplayRaytracing = false;
-				isDisplayZBuffer = true;
+				displayMode = ZBuffer;
+				std::cout << "Display mode: ZBuffer" << std::endl;
 			}
-			else if (isDisplayZBuffer)
+			else if (displayMode == ZBuffer)
 			{
-				std::cout << "Displaying rasterization" << std::endl;
-				isDisplayZBuffer = false;
+				displayMode = Normal;
+				std::cout << "Display mode: Normal" << std::endl;
+			}
+			else if (displayMode == Normal)
+			{
+				displayMode = AmbientOcclusion;
+				std::cout << "Display mode: AmbientOcclusion" << std::endl;
+			}
+			else
+			{
+				displayMode = Rasterization;
+				std::cout << "Display mode: Rasterization" << std::endl;
 			}
 		}
 		else if (action == GLFW_PRESS && key == GLFW_KEY_SPACE)
@@ -273,8 +290,9 @@ void initScene()
 	auto cameraPtr = std::make_shared<Camera>();
 	cameraPtr->setAspectRatio(static_cast<float>(width) / static_cast<float>(height));
 	cameraPtr->setTranslation(center + glm::vec3(0.0, 0.0, 3.0 * meshScale));
-	cameraPtr->setNear(0.1f);
-	cameraPtr->setFar(100.f * meshScale);
+	// I modified the near and far values to be able to see something on my Z-buffer for the more complicated mesh
+	cameraPtr->setNear(0.1f * meshScale); // original value = 0.1f
+	cameraPtr->setFar(10.f * meshScale);  // original value = 100.f * meshScale
 	scenePtr->set(cameraPtr);
 }
 
@@ -299,12 +317,26 @@ void clear()
 // The main rendering call
 void render()
 {
-	if (isDisplayRaytracing)
-		rasterizerPtr->display(rayTracerPtr->image());
-	else if (isDisplayZBuffer)
-		rasterizerPtr->displayZBuffer(scenePtr);
-	else
+	if (displayMode == Rasterization)
+	{
 		rasterizerPtr->render(scenePtr);
+	}
+	else if (displayMode == Raytracing)
+	{
+		rasterizerPtr->display(rayTracerPtr->image());
+	}
+	else if (displayMode == ZBuffer)
+	{
+		rasterizerPtr->displayZBuffer(scenePtr);
+	}
+	else if (displayMode == Normal)
+	{
+		rasterizerPtr->displayNormal(scenePtr);
+	}
+	else
+	{
+		rasterizerPtr->displayAmbientOcclusion(scenePtr);
+	}
 }
 
 // Update any accessible variable based on the current time

@@ -32,7 +32,10 @@ public:
 	void loadShaderProgram(const std::string &basePath);
 	void render(std::shared_ptr<Scene> scenePtr);
 	void display(std::shared_ptr<Image> imagePtr);
+	void computeZBuffer(std::shared_ptr<Scene> scenePtr);
 	void displayZBuffer(std::shared_ptr<Scene> scenePtr);
+	void displayNormal(std::shared_ptr<Scene> scenePtr);
+	void displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr);
 	void clear();
 
 private:
@@ -43,14 +46,16 @@ private:
 	void draw(size_t meshId, size_t triangleCount);
 
 	/// Pointer to GPU shader pipeline i.e., set of shaders structured in a GPU program
-	std::shared_ptr<ShaderProgram> m_pbrShaderProgramPtr;				  // A GPU program contains at least a vertex shader and a fragment shader
-	std::shared_ptr<ShaderProgram> m_displayShaderProgramPtr;		  // Full screen quad shader program, for displaying 2D color images
-	std::shared_ptr<ShaderProgram> m_ZBufferShaderProgramPtr;		  // Program to fill the Z buffer
-	std::shared_ptr<ShaderProgram> m_DisplayZBufferShaderProgramPtr; // Full screen quad shader program, for displaying the Z buffer
-	GLuint m_displayImageTex;													  // Texture storing the image to display in non-rasterization mode
-	GLuint m_screenQuadVao;														  // Full-screen quad drawn when displaying an image (no scene rasterization)
+	std::shared_ptr<ShaderProgram> m_pbrShaderProgramPtr;					 // A GPU program contains at least a vertex shader and a fragment shader
+	std::shared_ptr<ShaderProgram> m_displayShaderProgramPtr;			 // Full screen quad shader program, for displaying 2D color images
+	std::shared_ptr<ShaderProgram> m_ZBufferShaderProgramPtr;			 // Program to fill the Z buffer
+	std::shared_ptr<ShaderProgram> m_DisplayZBufferShaderProgramPtr;	 // Full screen quad shader program, for displaying the Z buffer
+	std::shared_ptr<ShaderProgram> m_AmbientOcclusionShaderProgramPtr; // Program to calculate and display ambient occlusion
+	GLuint m_displayImageTex;														 // Texture storing the image to display in non-rasterization mode
+	GLuint m_screenQuadVao;															 // Full-screen quad drawn when displaying an image (no scene rasterization)
 	GLuint ssaoFramebufferID;
 	GLuint ssaoDepthTextureID;
+	GLuint ssaoNormalTextureID;
 
 	std::vector<GLuint> m_vaos;
 	std::vector<GLuint> m_posVbos;
