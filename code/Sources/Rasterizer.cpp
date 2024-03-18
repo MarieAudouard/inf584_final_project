@@ -41,7 +41,7 @@ void Rasterizer::loadShaderProgram(const std::string &basePath)
 	try
 	{
 		std::string shaderPath = basePath + "/" + SHADER_PATH;
-		m_pbrShaderProgramPtr = ShaderProgram::genBasicShaderProgram(shaderPath + "/PBRVertexShader.glsl",
+		m_pbrShaderProgramPtr = ShaderProgram::genBasicShaderProgram(shaderPath + "/CalculationVertexShader.glsl",
 																						 shaderPath + "/PBRFragmentShader.glsl");
 	}
 	catch (std::exception &e)
@@ -64,9 +64,8 @@ void Rasterizer::loadShaderProgram(const std::string &basePath)
 	try
 	{
 		std::string shaderPath = basePath + "/" + SHADER_PATH;
-		m_ZBufferShaderProgramPtr = ShaderProgram::genBasicShaderProgram(shaderPath + "/ZBufferVertexShader.glsl",
+		m_ZBufferShaderProgramPtr = ShaderProgram::genBasicShaderProgram(shaderPath + "/CalculationVertexShader.glsl",
 																							  shaderPath + "/ZBufferFragmentShader.glsl");
-		glGenFramebuffers(1, &ssaoFramebufferID);
 	}
 	catch (std::exception &e)
 	{
@@ -92,6 +91,20 @@ void Rasterizer::loadShaderProgram(const std::string &basePath)
 																										  shaderPath + "/AmbientOcclusionFragmentShader.glsl");
 		m_AmbientOcclusionShaderProgramPtr->set("imageTexZ", 0);
 		m_AmbientOcclusionShaderProgramPtr->set("imageTexNormal", 1);
+	}
+	catch (std::exception &e)
+	{
+		exitOnCriticalError(std::string("[Error loading display shader program]") + e.what());
+	}
+	m_AmbientOcclusionPRBShaderProgramPtr.reset();
+	try
+	{
+		std::string shaderPath = basePath + "/" + SHADER_PATH;
+		m_AmbientOcclusionPRBShaderProgramPtr = ShaderProgram::genBasicShaderProgram(shaderPath + "/DisplayVertexShader.glsl",
+																											  shaderPath + "/AmbientOcclusionPRBFragmentShader.glsl");
+		m_AmbientOcclusionPRBShaderProgramPtr->set("imageTexZ", 0);
+		m_AmbientOcclusionPRBShaderProgramPtr->set("imageTexNormal", 1);
+		m_AmbientOcclusionPRBShaderProgramPtr->set("imageTexColor", 2);
 	}
 	catch (std::exception &e)
 	{
@@ -131,31 +144,78 @@ void Rasterizer::initDisplayedImage()
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// Creating the framebuffer that will contain the depth & normal
-	glBindFramebuffer(GL_FRAMEBUFFER, ssaoFramebufferID);
+	glGenFramebuffers(1, &zBufferFramebufferID);
+	glBindFramebuffer(GL_FRAMEBUFFER, zBufferFramebufferID);
 	// Creating the depth texture
-	glGenTextures(1, &ssaoDepthTextureID);
-	glBindTexture(GL_TEXTURE_2D, ssaoDepthTextureID);
+	glGenTextures(1, &depthTextureID);
+	glBindTexture(GL_TEXTURE_2D, depthTextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, ssaoDepthTextureID, 0);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthTextureID, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// Creating the normal texture
-	glGenTextures(1, &ssaoNormalTextureID);
-	glBindTexture(GL_TEXTURE_2D, ssaoNormalTextureID);
+	glGenTextures(1, &normalTextureID);
+	glBindTexture(GL_TEXTURE_2D, normalTextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, ssaoNormalTextureID, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normalTextureID, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// Creating the PRB color texture
+	glGenTextures(1, &colorTextureID);
+	glBindTexture(GL_TEXTURE_2D, colorTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_width, m_height, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, colorTextureID, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Rasterizer::drawMeshes(std::shared_ptr<ShaderProgram> shader, std::shared_ptr<Scene> scenePtr)
+{
+	size_t numOfMeshes = scenePtr->numOfMeshes();
+	for (size_t i = 0; i < numOfMeshes; i++)
+	{
+		glm::mat4 projectionMatrix = scenePtr->camera()->computeProjectionMatrix();
+		shader->set("projectionMat", projectionMatrix); // Compute the projection matrix of the camera and pass it to the GPU program
+		glm::mat4 modelMatrix = scenePtr->mesh(i)->computeTransformMatrix();
+		glm::mat4 viewMatrix = scenePtr->camera()->computeViewMatrix();
+		glm::mat4 modelViewMatrix = viewMatrix * modelMatrix;
+		glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelViewMatrix));
+		shader->set("modelViewMat", modelViewMatrix);
+		shader->set("normalMat", normalMatrix);
+		// Set the material properties
+		shader->set("material.albedo", scenePtr->mesh(i)->material()->albedo());
+		shader->set("material.roughness", scenePtr->mesh(i)->material()->roughness());
+		shader->set("material.metallicness", scenePtr->mesh(i)->material()->metallicness());
+		// Initialize the light sources
+		shader->set("directional_lightsource.color", scenePtr->directionallightsource()->color());
+		shader->set("directional_lightsource.intensity", scenePtr->directionallightsource()->intensity());
+		shader->set("point_lightsource.color", scenePtr->pointlightsource()->color());
+		shader->set("point_lightsource.intensity", scenePtr->pointlightsource()->intensity());
+		shader->set("point_lightsource.ac", scenePtr->pointlightsource()->ac());
+		shader->set("point_lightsource.al", scenePtr->pointlightsource()->al());
+		shader->set("point_lightsource.aq", scenePtr->pointlightsource()->aq());
+		// Set the position of the point light source
+		glm::vec4 scenePointLightPosition = viewMatrix * glm::vec4(scenePtr->pointlightsource()->position(), 1.0);
+		shader->set("point_lightsource.position", glm::vec3(scenePointLightPosition));
+		// Set the direction of the directional light source
+		glm::vec4 sceneDirectionalLightDirection = viewMatrix * glm::vec4(scenePtr->directionallightsource()->direction(), 0.0);
+		shader->set("directional_lightsource.direction", glm::vec3(sceneDirectionalLightDirection));
+		draw(i, scenePtr->mesh(i)->triangleIndices().size());
+	}
 }
 
 // The main rendering call
@@ -166,37 +226,9 @@ void Rasterizer::render(std::shared_ptr<Scene> scenePtr)
 	const glm::vec3 &bgColor = scenePtr->backgroundColor();
 	glClearColor(bgColor[0], bgColor[1], bgColor[2], 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the color and z buffers.
-	size_t numOfMeshes = scenePtr->numOfMeshes();
-	for (size_t i = 0; i < numOfMeshes; i++)
-	{
-		glm::mat4 projectionMatrix = scenePtr->camera()->computeProjectionMatrix();
-		m_pbrShaderProgramPtr->set("projectionMat", projectionMatrix); // Compute the projection matrix of the camera and pass it to the GPU program
-		glm::mat4 modelMatrix = scenePtr->mesh(i)->computeTransformMatrix();
-		glm::mat4 viewMatrix = scenePtr->camera()->computeViewMatrix();
-		glm::mat4 modelViewMatrix = viewMatrix * modelMatrix;
-		glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelViewMatrix));
-		m_pbrShaderProgramPtr->set("modelViewMat", modelViewMatrix);
-		m_pbrShaderProgramPtr->set("normalMat", normalMatrix);
-		// Set the material properties
-		m_pbrShaderProgramPtr->set("material.albedo", scenePtr->mesh(i)->material()->albedo());
-		m_pbrShaderProgramPtr->set("material.roughness", scenePtr->mesh(i)->material()->roughness());
-		m_pbrShaderProgramPtr->set("material.metallicness", scenePtr->mesh(i)->material()->metallicness());
-		// Initialize the light sources
-		m_pbrShaderProgramPtr->set("directional_lightsource.color", scenePtr->directionallightsource()->color());
-		m_pbrShaderProgramPtr->set("directional_lightsource.intensity", scenePtr->directionallightsource()->intensity());
-		m_pbrShaderProgramPtr->set("point_lightsource.color", scenePtr->pointlightsource()->color());
-		m_pbrShaderProgramPtr->set("point_lightsource.intensity", scenePtr->pointlightsource()->intensity());
-		m_pbrShaderProgramPtr->set("point_lightsource.ac", scenePtr->pointlightsource()->ac());
-		m_pbrShaderProgramPtr->set("point_lightsource.al", scenePtr->pointlightsource()->al());
-		m_pbrShaderProgramPtr->set("point_lightsource.aq", scenePtr->pointlightsource()->aq());
-		// Set the position of the point light source
-		glm::vec4 scenePointLightPosition = viewMatrix * glm::vec4(scenePtr->pointlightsource()->position(), 1.0);
-		m_pbrShaderProgramPtr->set("point_lightsource.position", glm::vec3(scenePointLightPosition));
-		// Set the direction of the directional light source
-		glm::vec4 sceneDirectionalLightDirection = viewMatrix * glm::vec4(scenePtr->directionallightsource()->direction(), 0.0);
-		m_pbrShaderProgramPtr->set("directional_lightsource.direction", glm::vec3(sceneDirectionalLightDirection));
-		draw(i, scenePtr->mesh(i)->triangleIndices().size());
-	}
+
+	drawMeshes(m_pbrShaderProgramPtr, scenePtr);
+
 	m_pbrShaderProgramPtr->stop();
 }
 
@@ -217,25 +249,14 @@ void Rasterizer::computeZBuffer(std::shared_ptr<Scene> scenePtr)
 {
 	// fill the Z buffer
 	m_ZBufferShaderProgramPtr->use(); // Activate the program to be used for upcoming primitive
-	glBindFramebuffer(GL_FRAMEBUFFER, ssaoFramebufferID);
-	GLenum drawBuffers[] = {GL_NONE, GL_COLOR_ATTACHMENT1};
-	glDrawBuffers(2, drawBuffers);
+	glBindFramebuffer(GL_FRAMEBUFFER, zBufferFramebufferID);
+	GLenum drawBuffers[] = {GL_NONE, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
+	glDrawBuffers(3, drawBuffers);
 	glReadBuffer(GL_NONE);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	size_t numOfMeshes = scenePtr->numOfMeshes();
-	for (size_t i = 0; i < numOfMeshes; i++)
-	{
-		glm::mat4 projectionMatrix = scenePtr->camera()->computeProjectionMatrix();
-		m_ZBufferShaderProgramPtr->set("projectionMat", projectionMatrix); // Compute the projection matrix of the camera and pass it to the GPU program
-		glm::mat4 modelMatrix = scenePtr->mesh(i)->computeTransformMatrix();
-		glm::mat4 viewMatrix = scenePtr->camera()->computeViewMatrix();
-		glm::mat4 modelViewMatrix = viewMatrix * modelMatrix;
-		glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelViewMatrix));
-		m_ZBufferShaderProgramPtr->set("modelViewMat", modelViewMatrix);
-		m_ZBufferShaderProgramPtr->set("normalMat", normalMatrix);
-		draw(i, scenePtr->mesh(i)->triangleIndices().size());
-	}
+	drawMeshes(m_ZBufferShaderProgramPtr, scenePtr);
+
 	m_ZBufferShaderProgramPtr->stop();
 }
 
@@ -249,7 +270,7 @@ void Rasterizer::displayZBuffer(std::shared_ptr<Scene> scenePtr)
 	// display the Z buffer
 	m_DisplayZBufferShaderProgramPtr->use(); // Activate the program to be used for upcoming primitive
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, ssaoDepthTextureID);
+	glBindTexture(GL_TEXTURE_2D, depthTextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0); // adapt to the size of the window
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
@@ -267,7 +288,7 @@ void Rasterizer::displayNormal(std::shared_ptr<Scene> scenePtr)
 	// display the normals
 	m_displayShaderProgramPtr->use(); // Activate the program to be used for upcoming primitive
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, ssaoNormalTextureID);
+	glBindTexture(GL_TEXTURE_2D, normalTextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
@@ -289,15 +310,43 @@ void Rasterizer::displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr)
 	m_AmbientOcclusionShaderProgramPtr->set("height", m_height);
 	m_AmbientOcclusionShaderProgramPtr->set("fov", scenePtr->camera()->getFoV());
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, ssaoDepthTextureID);
+	glBindTexture(GL_TEXTURE_2D, depthTextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0); // adapt to the size of the window
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, ssaoNormalTextureID);
+	glBindTexture(GL_TEXTURE_2D, normalTextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
 	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
 	m_AmbientOcclusionShaderProgramPtr->stop();
+}
+
+void Rasterizer::displayAmbientOcclusionWithPRB(std::shared_ptr<Scene> scenePtr)
+{
+	computeZBuffer(scenePtr);
+
+	// Switch to the default framebuffer for displaying the Z-buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// display the Z buffer
+	m_AmbientOcclusionPRBShaderProgramPtr->use(); // Activate the program to be used for upcoming primitive
+	m_AmbientOcclusionPRBShaderProgramPtr->set("aspectRatio", scenePtr->camera()->getAspectRatio());
+	m_AmbientOcclusionPRBShaderProgramPtr->set("width", m_width);
+	m_AmbientOcclusionPRBShaderProgramPtr->set("height", m_height);
+	m_AmbientOcclusionPRBShaderProgramPtr->set("fov", scenePtr->camera()->getFoV());
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, depthTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0); // adapt to the size of the window to avoid deformation
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, normalTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, colorTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_width, m_height, 0, GL_RGBA, GL_FLOAT, NULL);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
+	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
+	m_AmbientOcclusionPRBShaderProgramPtr->stop();
 }
 
 void Rasterizer::clear()

@@ -67,7 +67,8 @@ enum DisplayMode
 	Raytracing,
 	ZBuffer,
 	Normal,
-	AmbientOcclusion
+	AmbientOcclusion,
+	AmbientOcclusionWithRasterization
 };
 
 static DisplayMode displayMode = Rasterization;
@@ -76,7 +77,7 @@ void clear();
 
 void printHelp()
 {
-	Console::print(std::string("Help:\n") + "\tMouse commands:\n" + "\t* Left button: rotate camera\n" + "\t* Middle button: zoom\n" + "\t* Right button: pan camera\n" + "\tKeyboard commands:\n" + "\t* ESC: quit the program\n" + "\t* H: print this help\n" + "\t* F12: reload GPU shaders\n" + "\t* F: decrease field of view\n" + "\t* G: increase field of view\n" + "\t* TAB: switch between rasterization, ray tracing, Zbuffer, normal display and ambient occlusion\n" + "\t* SPACE: execute ray tracing\n");
+	Console::print(std::string("Help:\n") + "\tMouse commands:\n" + "\t* Left button: rotate camera\n" + "\t* Middle button: zoom\n" + "\t* Right button: pan camera\n" + "\tKeyboard commands:\n" + "\t* ESC: quit the program\n" + "\t* H: print this help\n" + "\t* F12: reload GPU shaders\n" + "\t* F: decrease field of view\n" + "\t* G: increase field of view\n" + "\t* TAB: switch between rasterization, ray tracing, Zbuffer, normal display, horizon-based ambient occlusion (HBAO) and HBAO with rasterization\n" + "\t* S: switch between rasterization and rasterization + HBAO\n" + "\t* SPACE: execute ray tracing\n");
 }
 
 /// Adjust the ray tracer target resolution and runs it.
@@ -134,6 +135,24 @@ void keyCallback(GLFWwindow *windowPtr, int key, int scancode, int action, int m
 			{
 				displayMode = AmbientOcclusion;
 				std::cout << "Display mode: AmbientOcclusion" << std::endl;
+			}
+			else if (displayMode == AmbientOcclusion)
+			{
+				displayMode = AmbientOcclusionWithRasterization;
+				std::cout << "Display mode: AmbientOcclusionWithRasterization" << std::endl;
+			}
+			else
+			{
+				displayMode = Rasterization;
+				std::cout << "Display mode: Rasterization" << std::endl;
+			}
+		}
+		else if (action == GLFW_PRESS && key == GLFW_KEY_S)
+		{
+			if (displayMode == Rasterization)
+			{
+				displayMode = AmbientOcclusionWithRasterization;
+				std::cout << "Display mode: AmbientOcclusionWithRasterization" << std::endl;
 			}
 			else
 			{
@@ -267,8 +286,6 @@ void initScene()
 	scenePtr = std::make_shared<Scene>();
 	scenePtr->setBackgroundColor(glm::vec3(0.1f, 0.5f, 0.95f));
 	scenePtr->setDirectionalLightsource(DirectionalLightsource(glm::vec3(-1.0, 0.0, 0.0), glm::vec3(1.0, 1.0, 1.0), 3.0));
-	scenePtr->setPointLightsource(PointLightsource(glm::vec3(1.0, 0.0, 1.0), 15.0));
-	scenePtr->pointlightsource()->setPosition(glm::vec3(-2.0, 0.0, 2.0));
 
 	// Mesh
 	auto meshPtr = std::make_shared<Mesh>();
@@ -281,8 +298,12 @@ void initScene()
 		exitOnCriticalError(std::string("[Error loading mesh]") + e.what());
 	}
 	meshPtr->computeBoundingSphere(center, meshScale);
-	meshPtr->setMaterial(Material(glm::vec3(1.0, 1.0, 0.0), 0.2, 0.0));
+	meshPtr->setMaterial(Material(glm::vec3(1.0, 1.0, 0.0), 0.8, 0.0));
 	scenePtr->add(meshPtr);
+
+	// Point Lights are added after the mesh to be able to use the mesh's bounding sphere
+	scenePtr->setPointLightsource(PointLightsource(glm::vec3(1.0, 0.0, 1.0), 15.0));
+	scenePtr->pointlightsource()->setPosition(glm::vec3(-0.5 * meshScale, 0.0, 0.9 * meshScale));
 
 	// Camera
 	int width, height;
@@ -334,9 +355,13 @@ void render()
 	{
 		rasterizerPtr->displayNormal(scenePtr);
 	}
-	else
+	else if (displayMode == AmbientOcclusion)
 	{
 		rasterizerPtr->displayAmbientOcclusion(scenePtr);
+	}
+	else
+	{
+		rasterizerPtr->displayAmbientOcclusionWithPRB(scenePtr);
 	}
 }
 

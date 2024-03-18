@@ -221,8 +221,8 @@ glm::vec3 RayTracer::shade(const Ray &ray, const RayHit &hit, const std::shared_
 	// BRDF microfacets
 	glm::vec3 radiance = glm::vec3(0.0);
 	glm::vec3 n = glm::normalize(fNormal);
-	glm::vec3 wo = glm::normalize(-fPosition);
-	glm::vec3 lightPosition = glm::vec3(glm::vec4(point_lightsource->position(), 1.0));
+	glm::vec3 wo = glm::normalize(scenePtr->camera()->getTranslation() - fPosition); // eye direction, need to use the camera position as opposed to PBRFragmentShader because we are in world space here
+	glm::vec3 lightPosition = point_lightsource->position();
 	glm::vec3 wi = glm::normalize(lightPosition - fPosition);
 	glm::vec3 li = attenuation(point_lightsource, lightPosition, fPosition);
 	glm::vec3 fd = diffuseBRDF(material);

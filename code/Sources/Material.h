@@ -8,7 +8,7 @@ class Material
 public:
    inline virtual ~Material() {}
 
-   inline Material(glm::vec3 albedo = glm::vec3(0.f, 0.f, 0.f), float roughness = 0.2f, float metalicness = 0.f) : m_albedo(albedo), m_roughness(roughness), m_metallicness(metalicness) {}
+   inline Material(glm::vec3 albedo = glm::vec3(0.f, 0.f, 0.f), float roughness = 0.2f, float metallicness = 0.f) : m_albedo(albedo), m_roughness(roughness), m_metallicness(metallicness) {}
 
    inline const glm::vec3 &albedo() const { return m_albedo; }
    inline void setAlbedo(const glm::vec3 &albedo) { this->m_albedo = albedo; }

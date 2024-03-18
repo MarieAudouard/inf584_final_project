@@ -91,11 +91,11 @@ void main () {
 	vec3 fd = diffuseBRDF(material);
 	vec3 fs = microfacetBRDF(material, n, wo, wi);
 	vec3 fr = fd+fs;
-	float nDotL = max(0.0, dot( n, wi));
+	float nDotL = max(0.0, dot(n, wi));
 	radiance += li * fr * nDotL;
 	//directional light source code
 	float cosTheta2 = max(0, dot(fNormal, -directional_lightsource.direction));
- 	vec4 colorResponse2 = vec4(cosTheta2 * fd * directional_lightsource.color * directional_lightsource.intensity, 1.0);
+ 	vec3 colorResponse2 = cosTheta2 * fd * directional_lightsource.color * directional_lightsource.intensity;
 	radiance += colorResponse2.rgb;
 	radiance = toneMapping(radiance, 1.0, 1.0);
 	colorResponse = vec4(radiance, 1.0);
