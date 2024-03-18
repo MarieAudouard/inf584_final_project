@@ -291,8 +291,9 @@ void initScene()
 	cameraPtr->setAspectRatio(static_cast<float>(width) / static_cast<float>(height));
 	cameraPtr->setTranslation(center + glm::vec3(0.0, 0.0, 3.0 * meshScale));
 	// I modified the near and far values to be able to see something on my Z-buffer for the more complicated mesh
-	cameraPtr->setNear(0.1f * meshScale); // original value = 0.1f
-	cameraPtr->setFar(10.f * meshScale);  // original value = 100.f * meshScale
+	std::cout << "Mesh scale: " << meshScale << std::endl; // to be able to pick R values for the ambient occlusion
+	cameraPtr->setNear(0.1f * meshScale);						 // original value = 0.1f
+	cameraPtr->setFar(10.f * meshScale);						 // original value = 100.f * meshScale
 	scenePtr->set(cameraPtr);
 }
 
