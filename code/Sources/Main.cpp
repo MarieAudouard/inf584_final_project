@@ -77,7 +77,7 @@ void clear();
 
 void printHelp()
 {
-	Console::print(std::string("Help:\n") + "\tMouse commands:\n" + "\t* Left button: rotate camera\n" + "\t* Middle button: zoom\n" + "\t* Right button: pan camera\n" + "\tKeyboard commands:\n" + "\t* ESC: quit the program\n" + "\t* H: print this help\n" + "\t* F12: reload GPU shaders\n" + "\t* F: decrease field of view\n" + "\t* G: increase field of view\n" + "\t* TAB: switch between rasterization, ray tracing, Zbuffer, normal display, horizon-based ambient occlusion (HBAO) and HBAO with rasterization\n" + "\t* S: switch between rasterization and rasterization + HBAO\n" + "\t* SPACE: execute ray tracing\n");
+	Console::print(std::string("Help:\n") + "\tMouse commands:\n" + "\t* Left button: rotate camera\n" + "\t* Middle button: zoom\n" + "\t* Right button: pan camera\n" + "\tKeyboard commands:\n" + "\t* ESC: quit the program\n" + "\t* H: print this help\n" + "\t* F12: reload GPU shaders\n" + "\t* F: decrease field of view\n" + "\t* G: increase field of view\n" + "\t* TAB: switch between rasterization, ray tracing, Zbuffer, normal display, horizon-based ambient occlusion (HBAO) and HBAO with rasterization\n" + "\t* S: switch between rasterization and rasterization + HBAO\n" + "\t* SPACE: execute ray tracing (to avoid unless very low poly mesh)\n");
 }
 
 /// Adjust the ray tracer target resolution and runs it.
@@ -302,8 +302,8 @@ void initScene()
 	scenePtr->add(meshPtr);
 
 	// Point Lights are added after the mesh to be able to use the mesh's bounding sphere
-	scenePtr->setPointLightsource(PointLightsource(glm::vec3(1.0, 0.0, 1.0), 15.0));
-	scenePtr->pointlightsource()->setPosition(glm::vec3(-0.5 * meshScale, 0.0, 0.9 * meshScale));
+	scenePtr->setPointLightsource(PointLightsource(glm::vec3(1.0, 0.0, 1.0), 1.0));
+	scenePtr->pointlightsource()->setPosition(glm::vec3(-0.2 * meshScale, 0.0, meshScale));
 
 	// Camera
 	int width, height;

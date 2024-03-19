@@ -8,6 +8,7 @@
 // ----------------------------------------------
 #include "Rasterizer.h"
 #include <glad/glad.h>
+#include <GLFW/glfw3.h> // to be able to use the time
 #include "Resources.h"
 #include "Error.h"
 
@@ -33,6 +34,14 @@ void Rasterizer::setResolution(int width, int height)
 	glViewport(0, 0, (GLint)width, (GLint)height); // Dimension of the rendering region in the window
 	m_width = width;
 	m_height = height;
+	// adapt the size of the textures to the size of the window
+	glBindTexture(GL_TEXTURE_2D, depthTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glBindTexture(GL_TEXTURE_2D, normalTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
+	glBindTexture(GL_TEXTURE_2D, colorTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_width, m_height, 0, GL_RGBA, GL_FLOAT, NULL);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Rasterizer::loadShaderProgram(const std::string &basePath)
@@ -271,7 +280,6 @@ void Rasterizer::displayZBuffer(std::shared_ptr<Scene> scenePtr)
 	m_DisplayZBufferShaderProgramPtr->use(); // Activate the program to be used for upcoming primitive
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, depthTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0); // adapt to the size of the window
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
 	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
@@ -289,7 +297,6 @@ void Rasterizer::displayNormal(std::shared_ptr<Scene> scenePtr)
 	m_displayShaderProgramPtr->use(); // Activate the program to be used for upcoming primitive
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, normalTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
 	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
@@ -309,12 +316,11 @@ void Rasterizer::displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr)
 	m_AmbientOcclusionShaderProgramPtr->set("width", m_width);
 	m_AmbientOcclusionShaderProgramPtr->set("height", m_height);
 	m_AmbientOcclusionShaderProgramPtr->set("fov", scenePtr->camera()->getFoV());
+	m_AmbientOcclusionShaderProgramPtr->set("time", (float)glfwGetTime());
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, depthTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0); // adapt to the size of the window
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, normalTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
 	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
@@ -334,15 +340,13 @@ void Rasterizer::displayAmbientOcclusionWithPRB(std::shared_ptr<Scene> scenePtr)
 	m_AmbientOcclusionPRBShaderProgramPtr->set("width", m_width);
 	m_AmbientOcclusionPRBShaderProgramPtr->set("height", m_height);
 	m_AmbientOcclusionPRBShaderProgramPtr->set("fov", scenePtr->camera()->getFoV());
+	m_AmbientOcclusionPRBShaderProgramPtr->set("time", (float)glfwGetTime());
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, depthTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0); // adapt to the size of the window to avoid deformation
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, normalTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, m_width, m_height, 0, GL_RGB, GL_FLOAT, NULL);
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, colorTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_width, m_height, 0, GL_RGBA, GL_FLOAT, NULL);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
 	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
