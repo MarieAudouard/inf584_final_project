@@ -84,10 +84,9 @@ Horizon compute_h_theta(float theta, float R_projected, vec3 P, Horizon horizon,
 
 Horizon compute_for_theta(float theta, vec3 N, vec3 V, vec3 t0, vec3 t1, vec3 P, vec2 snapped_coords) {
    vec3 t = normalize(t0 * cos(theta) + t1 * sin(theta));
-   vec3 normal = normalize(cross(t, V)); // normal to the plane defined by t and V
    float R_in_image_coords = R / tan(radians(fov) / 2.f) * (height/2);
-   float R_projected = R_in_image_coords * dot(normal, V);
    float t_theta = compute_angle(t);
+   float R_projected = R_in_image_coords * cos(t_theta);
    Horizon horizon = Horizon(t_theta, t_theta, P + 2*R*vec3(1.0)); // we initialize the horizon point to a point far away to ensure that the W(theta) will be 0 if h_theta=t_theta
    horizon = compute_h_theta(theta, R_projected, P, horizon, snapped_coords);
    return horizon; // we return t_theta and h_theta
@@ -96,8 +95,7 @@ Horizon compute_for_theta(float theta, vec3 N, vec3 V, vec3 t0, vec3 t1, vec3 P,
 void main () {
    vec2 snapped_coords = snap_to_texel_center(fTexCoords);
    vec3 in_cam_coords = to_cam_coords(snapped_coords);
-   //vec3 V = normalize(-in_cam_coords); // the camera is at (0,0,0) in camera space
-   vec3 V = vec3(0, 0, -1); // not the actual view vector, but what seems to be done in the paper
+   vec3 V = vec3(0, 0, -1); // not the actual view vector, but what is used in the paper
    vec3 N = texture(imageTexNormal, snapped_coords).xyz;
    vec3 t0 = normalize(cross(N, V));
    vec3 t1 = normalize(cross(t0, N));

@@ -100,7 +100,7 @@ void main () {
  	vec3 colorResponse2 = cosTheta2 * fd * directional_lightsource.color * directional_lightsource.intensity;
 	radiance += colorResponse2.rgb;
 	radiance = toneMapping(radiance, 1.0, 1.0);
-    // according to https://registry.khronos.org/OpenGL-Refpages/gl4/html/gl_FragDepth.xhtml the depth value is automatically set by the fragment shader
-    texNormal = n;
+   // according to https://registry.khronos.org/OpenGL-Refpages/gl4/html/gl_FragDepth.xhtml the depth value is automatically set by the fragment shader
+   texNormal = n;
 	texColor = vec4(radiance, 1.0);
 }
