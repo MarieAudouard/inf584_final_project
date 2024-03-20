@@ -16,7 +16,7 @@ out vec4 colorResponse; // Shader output: the color response attached to this fr
 
 int N_d = 8; // number of sampled angles
 int N_s = 8; // number of samples to calculate h(theta)
-float R = 1.0; // radius of influence
+float R = 2.0; // radius of influence
 
 struct Horizon {
    float t_theta;
@@ -37,14 +37,14 @@ float random2(vec3 pos){
 // snaps a uv coord to the nearest texel centre
 vec2 snap_to_texel_center(vec2 texCoords)
 {
-   float texX = round(texCoords.x * width) / width;
-   float texY = round(texCoords.y * height) / height;
+   float texX = (round(texCoords.x * width) + 0.5) / width;
+   float texY = (round(texCoords.y * height) + 0.5) / height;
    return vec2(texX, texY);
 }
 
 vec3 to_cam_coords(vec2 texCoords) {
-   float px = ((2 * texCoords.x / width) - 1.f) * tan(radians(fov) / 2.f) * aspectRatio;
-   float py = ((2 * texCoords.y / height) - 1.f) * tan(radians(fov) / 2.f);
+   float px = ((2 * texCoords.x) - 1.f) * tan(radians(fov) / 2.f) * aspectRatio;
+   float py = ((2 * texCoords.y) - 1.f) * tan(radians(fov) / 2.f);
    return vec3(px, py, texture(imageTexZ, texCoords).r);
 }
 
@@ -72,18 +72,19 @@ Horizon update_alpha_s_i(vec3 P, vec2 S_i_tex, Horizon current_value) {
 
 Horizon compute_h_theta(float theta, float R_projected, vec3 P, Horizon horizon, vec2 snapped_coords) {
    float real_s_step = R_projected / N_s;
-   float s_step = real_s_step + real_s_step * (random2(vec3(snapped_coords, time)) - 0.5) / (2 * N_s); // Jitter step
+   float s_step = real_s_step + real_s_step * (random2(vec3(snapped_coords, time)) - 0.5) / (4 * N_s); // Jittered step
    for (int i = 0; i < N_s; i++) {
-      float s = i * s_step;
+      float s = (i+1) * s_step;
       vec2 S_i_tex = snapped_coords + vec2(s * cos(theta), s * sin(theta));
-      horizon = update_alpha_s_i(P, S_i_tex, horizon);
+      vec2 S_i_tex_snapped = snap_to_texel_center(S_i_tex);
+      horizon = update_alpha_s_i(P, S_i_tex_snapped, horizon);
    }
    return horizon;
 }
 
-Horizon compute_for_theta(float theta, vec3 N, vec3 V, vec3 t0, vec3 t1, vec3 P, vec2 snapped_coords) {
-   vec3 t = normalize(t0 * cos(theta) + t1 * sin(theta));
-   float R_in_image_coords = R / tan(radians(fov) / 2.f) * (height/2);
+Horizon compute_for_theta(float theta, vec3 N, vec3 V, vec3 P, vec2 snapped_coords) {
+   vec3 t = normalize(cross(N, vec3(sin(theta), -cos(theta), 0))); // tangent vector "along" theta
+   float R_in_image_coords = R / tan(radians(fov) / 2.f) * (1/2);
    float t_theta = compute_angle(t);
    float R_projected = R_in_image_coords * cos(t_theta);
    Horizon horizon = Horizon(t_theta, t_theta, P + 2*R*vec3(1.0)); // we initialize the horizon point to a point far away to ensure that the W(theta) will be 0 if h_theta=t_theta
@@ -96,8 +97,6 @@ void main () {
    vec3 in_cam_coords = to_cam_coords(snapped_coords);
    vec3 V = vec3(0, 0, -1); // not the actual view vector, but what is used in the paper
    vec3 N = texture(imageTexNormal, snapped_coords).xyz;
-   vec3 t0 = normalize(cross(N, V));
-   vec3 t1 = normalize(cross(t0, N));
 
    float A = 0.0;
 
@@ -105,7 +104,7 @@ void main () {
    float theta_min = (random(vec3(fTexCoords, time)) - 0.5) * theta_step / 5; // Jitter
    for (int i = 0; i < N_d; i++) {
       float theta = theta_min + i * theta_step;
-      Horizon horizon = compute_for_theta(theta, N, V, t0, t1, in_cam_coords, snapped_coords);
+      Horizon horizon = compute_for_theta(theta, N, V, in_cam_coords, snapped_coords);
       A += (sin(horizon.h_theta) - sin(horizon.t_theta)) * W(length(in_cam_coords - horizon.horizon_point));
    }
 
