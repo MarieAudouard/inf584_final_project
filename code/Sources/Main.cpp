@@ -73,6 +73,8 @@ enum DisplayMode
 
 static DisplayMode displayMode = Rasterization;
 
+static bool print_time = true;
+
 void clear();
 
 void printHelp()
@@ -134,11 +136,13 @@ void keyCallback(GLFWwindow *windowPtr, int key, int scancode, int action, int m
 			else if (displayMode == Normal)
 			{
 				displayMode = AmbientOcclusion;
+				print_time = true;
 				std::cout << "Display mode: AmbientOcclusion" << std::endl;
 			}
 			else if (displayMode == AmbientOcclusion)
 			{
 				displayMode = AmbientOcclusionWithRasterization;
+				print_time = true;
 				std::cout << "Display mode: AmbientOcclusionWithRasterization" << std::endl;
 			}
 			else
@@ -152,6 +156,7 @@ void keyCallback(GLFWwindow *windowPtr, int key, int scancode, int action, int m
 			if (displayMode == Rasterization)
 			{
 				displayMode = AmbientOcclusionWithRasterization;
+				print_time = true;
 				std::cout << "Display mode: AmbientOcclusionWithRasterization" << std::endl;
 			}
 			else
@@ -357,11 +362,11 @@ void render()
 	}
 	else if (displayMode == AmbientOcclusion)
 	{
-		rasterizerPtr->displayAmbientOcclusion(scenePtr);
+		rasterizerPtr->displayAmbientOcclusion(scenePtr, print_time);
 	}
 	else
 	{
-		rasterizerPtr->displayAmbientOcclusionWithPRB(scenePtr);
+		rasterizerPtr->displayAmbientOcclusionWithPRB(scenePtr, print_time);
 	}
 }
 

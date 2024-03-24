@@ -303,9 +303,23 @@ void Rasterizer::displayNormal(std::shared_ptr<Scene> scenePtr)
 	m_displayShaderProgramPtr->stop();
 }
 
-void Rasterizer::displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr)
+void Rasterizer::displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr, bool &print_time)
 {
+	std::chrono::high_resolution_clock clock;
+	if (print_time)
+	{
+		Console::print("Start rasterizing (with " + std::to_string(m_width) + "x" + std::to_string(m_height) + " resolution)...");
+	}
+	std::chrono::time_point<std::chrono::high_resolution_clock> before = clock.now();
 	computeZBuffer(scenePtr);
+
+	std::chrono::time_point<std::chrono::high_resolution_clock> after = clock.now();
+	double elapsedTime = (double)std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count();
+	if (print_time)
+	{
+		Console::print("Rasterization executed in " + std::to_string(elapsedTime) + "ms");
+		Console::print("Start calculating Horizon-Based Ambient Occlusion...");
+	}
 
 	// Switch to the default framebuffer for displaying the Z-buffer
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -316,7 +330,6 @@ void Rasterizer::displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr)
 	m_AmbientOcclusionShaderProgramPtr->set("width", m_width);
 	m_AmbientOcclusionShaderProgramPtr->set("height", m_height);
 	m_AmbientOcclusionShaderProgramPtr->set("fov", scenePtr->camera()->getFoV());
-	m_AmbientOcclusionShaderProgramPtr->set("time", (float)glfwGetTime());
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, depthTextureID);
 	glActiveTexture(GL_TEXTURE1);
@@ -325,11 +338,33 @@ void Rasterizer::displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr)
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
 	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
 	m_AmbientOcclusionShaderProgramPtr->stop();
+
+	std::chrono::time_point<std::chrono::high_resolution_clock> after2 = clock.now();
+	double elapsedTime2 = (double)std::chrono::duration_cast<std::chrono::microseconds>(after2 - after).count();
+	if (print_time)
+	{
+		Console::print("HBAO executed in " + std::to_string(elapsedTime2) + " micro seconds");
+		print_time = false;
+	}
 }
 
-void Rasterizer::displayAmbientOcclusionWithPRB(std::shared_ptr<Scene> scenePtr)
+void Rasterizer::displayAmbientOcclusionWithPRB(std::shared_ptr<Scene> scenePtr, bool &print_time)
 {
+	std::chrono::high_resolution_clock clock;
+	if (print_time)
+	{
+		Console::print("Start rasterizing (with " + std::to_string(m_width) + "x" + std::to_string(m_height) + " resolution)...");
+	}
+	std::chrono::time_point<std::chrono::high_resolution_clock> before = clock.now();
 	computeZBuffer(scenePtr);
+
+	std::chrono::time_point<std::chrono::high_resolution_clock> after = clock.now();
+	double elapsedTime = (double)std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count();
+	if (print_time)
+	{
+		Console::print("Rasterization executed in " + std::to_string(elapsedTime) + "ms");
+		Console::print("Start calculating Horizon-Based Ambient Occlusion with colors...");
+	}
 
 	// Switch to the default framebuffer for displaying the Z-buffer
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -340,7 +375,6 @@ void Rasterizer::displayAmbientOcclusionWithPRB(std::shared_ptr<Scene> scenePtr)
 	m_AmbientOcclusionPRBShaderProgramPtr->set("width", m_width);
 	m_AmbientOcclusionPRBShaderProgramPtr->set("height", m_height);
 	m_AmbientOcclusionPRBShaderProgramPtr->set("fov", scenePtr->camera()->getFoV());
-	m_AmbientOcclusionPRBShaderProgramPtr->set("time", (float)glfwGetTime());
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, depthTextureID);
 	glActiveTexture(GL_TEXTURE1);
@@ -351,6 +385,14 @@ void Rasterizer::displayAmbientOcclusionWithPRB(std::shared_ptr<Scene> scenePtr)
 	glBindVertexArray(m_screenQuadVao); // Activate the VAO storing geometry data
 	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(6), GL_UNSIGNED_INT, 0);
 	m_AmbientOcclusionPRBShaderProgramPtr->stop();
+
+	std::chrono::time_point<std::chrono::high_resolution_clock> after2 = clock.now();
+	double elapsedTime2 = (double)std::chrono::duration_cast<std::chrono::microseconds>(after2 - after).count();
+	if (print_time)
+	{
+		Console::print("HBAO with colors executed in " + std::to_string(elapsedTime2) + " micro seconds");
+		print_time = false;
+	}
 }
 
 void Rasterizer::clear()

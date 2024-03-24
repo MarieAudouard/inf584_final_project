@@ -8,7 +8,6 @@ uniform int width;
 uniform int height;
 uniform float fov;
 uniform float aspectRatio;
-uniform float time;
 
 in vec2 fTexCoords;
 
@@ -24,15 +23,80 @@ struct Horizon {
    vec3 horizon_point;
 };
 
-// found at https://www.shadertoy.com/view/WljBDh
-float random(vec3 pos){
-    return fract(sin(dot(pos, vec3(64.25375463, 23.27536534, 86.29678483))) * 59482.7542);
+/*************************************************************************************************
+* Mark Jarzynski and Marc Olano, Hash Functions for GPU Rendering, 
+* Journal of Computer Graphics Techniques (JCGT), vol. 9, no. 3, 21-38, 2020
+* Available online http://jcgt.org/published/0009/03/02/
+* 
+* The following hash functions are taken from the JCGT paper.
+* 
+*/
+
+// http://www.jcgt.org/published/0009/03/02/
+uvec3 pcg3d(uvec3 v) {
+
+   v = v * 1664525u + 1013904223u;
+
+   v.x += v.y*v.z;
+   v.y += v.z*v.x;
+   v.z += v.x*v.y;
+
+   v ^= v >> 16u;
+
+   v.x += v.y*v.z;
+   v.y += v.z*v.x;
+   v.z += v.x*v.y;
+
+   return v;
 }
 
-// to have a different random number for the jitter step
-float random2(vec3 pos){
-    return fract(cos(dot(pos, vec3(43.25375463, 32.27536534, 78.29678483))) * 39872.1684);
+uint xxhash32(uvec2 p)
+{
+   const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
+   const uint PRIME32_4 = 668265263U, PRIME32_5 = 374761393U;
+   uint h32 = p.y + PRIME32_5 + p.x*PRIME32_3;
+   h32 = PRIME32_4*((h32 << 17) | (h32 >> (32 - 17)));
+   h32 = PRIME32_2*(h32^(h32 >> 15));
+   h32 = PRIME32_3*(h32^(h32 >> 13));
+   return h32^(h32 >> 16);
 }
+
+uvec3 hash(vec2 s)
+{	  
+   uvec4 u = uvec4(s, uint(s.x) ^ uint(s.y), uint(s.x) + uint(s.y));
+   return pcg3d(u.xyz);
+}
+
+uvec3 hash2(vec2 s)
+{	  
+   uvec4 u = uvec4(s, uint(s.x) ^ uint(s.y), uint(s.x) + uint(s.y));
+   return uvec3(xxhash32(u.xy)); 
+}
+
+
+float random(vec2 v)
+{
+   // Thanks to "hash: visualising bitplanes" by hornet https://www.shadertoy.com/view/lt2yDm
+   
+   uint bit = uint(8.0 * v.x) + 8u * uint(4.0 * v.y);
+   vec2 seed = v;
+   uvec3 hash = hash(seed);
+   return float((hash >> bit) & 1u);
+}
+
+float random2(vec2 v)
+{
+   // Thanks to "hash: visualising bitplanes" by hornet https://www.shadertoy.com/view/lt2yDm
+   
+   uint bit = uint(8.0 * v.x) + 8u * uint(4.0 * v.y);
+   vec2 seed = v;
+   uvec3 hash = hash2(seed);
+   return float((hash >> bit) & 1u);
+}
+/*************************************************************************************************
+* End of the code from the JCGT paper 
+*/
+
 
 // snaps a uv coord to the nearest texel centre
 vec2 snap_to_texel_center(vec2 texCoords)
@@ -72,7 +136,7 @@ Horizon update_alpha_s_i(vec3 P, vec2 S_i_tex, Horizon current_value) {
 
 Horizon compute_h_theta(float theta, float R_projected, vec3 P, Horizon horizon, vec2 snapped_coords) {
    float real_s_step = R_projected / N_s;
-   float s_step = real_s_step + real_s_step * (random2(vec3(snapped_coords, time)) - 0.5) / (4 * N_s); // Jittered step
+   float s_step = real_s_step + real_s_step * (random2(snapped_coords) - 0.5) / (4 * N_s); // Jittered step
    for (int i = 0; i < N_s; i++) {
       float s = (i+1) * s_step;
       vec2 S_i_tex = snapped_coords + vec2(s * cos(theta), s * sin(theta));
@@ -86,9 +150,8 @@ Horizon compute_for_theta(float theta, vec3 N, vec3 V, vec3 P, vec2 snapped_coor
    vec3 t = normalize(cross(N, vec3(sin(theta), -cos(theta), 0))); // tangent vector "along" theta
    float R_in_image_coords = R / tan(radians(fov) / 2.f) * (1/2);
    float t_theta = compute_angle(t);
-   float R_projected = R_in_image_coords * cos(t_theta);
    Horizon horizon = Horizon(t_theta, t_theta, P + 2*R*vec3(1.0)); // we initialize the horizon point to a point far away to ensure that the W(theta) will be 0 if h_theta=t_theta
-   horizon = compute_h_theta(theta, R_projected, P, horizon, snapped_coords);
+   horizon = compute_h_theta(theta, R_in_image_coords, P, horizon, snapped_coords);
    return horizon; // we return t_theta and h_theta
 }
 
@@ -101,7 +164,7 @@ void main () {
    float A = 0.0;
 
    float theta_step = 2 * PI / N_d;
-   float theta_min = (random(vec3(fTexCoords, time)) - 0.5) * theta_step / 5; // Jitter
+   float theta_min = (random(fTexCoords) - 0.5) * theta_step / 5; // Jitter
    for (int i = 0; i < N_d; i++) {
       float theta = theta_min + i * theta_step;
       Horizon horizon = compute_for_theta(theta, N, V, in_cam_coords, snapped_coords);

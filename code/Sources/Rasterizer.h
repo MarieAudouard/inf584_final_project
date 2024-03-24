@@ -10,7 +10,9 @@
 
 #include <glad/glad.h>
 #include <string>
+#include <chrono>
 
+#include "Console.h"
 #include "Scene.h"
 #include "Mesh.h"
 #include "Image.h"
@@ -36,8 +38,8 @@ public:
 	void computeZBuffer(std::shared_ptr<Scene> scenePtr);
 	void displayZBuffer(std::shared_ptr<Scene> scenePtr);
 	void displayNormal(std::shared_ptr<Scene> scenePtr);
-	void displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr);
-	void displayAmbientOcclusionWithPRB(std::shared_ptr<Scene> scenePtr);
+	void displayAmbientOcclusion(std::shared_ptr<Scene> scenePtr, bool &print_time);
+	void displayAmbientOcclusionWithPRB(std::shared_ptr<Scene> scenePtr, bool &print_time);
 	void clear();
 
 private:
