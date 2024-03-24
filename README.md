@@ -7,13 +7,13 @@ In this project, I implemented the Horizon-Based Ambient Occlusion paper _Image-
 
 ## Installation
 
-The details about how to install and run the code are given in the README.md file in the code folder.
+The details about how to install and run the code are given in the README.md file in the code folder. The `<path-to-MyRenderer-directory>` should be the path to the `code` folder of this repository.
 
-I have observed that the ambient occlusion display did not work when my computer ran the program on the integrated GPU (Intel i7) but worked on my NVIDIA GPU. I did not attempt to solve this problem as I did not understand its origin.
+I have observed that the ambient occlusion display did not work when my computer ran the program on the integrated GPU (Intel i7) but worked on my NVIDIA GPU. I did not attempt to solve this problem as it was not the goal of the project.
 
 ## Results
 
-The program yields the foolowing results for the denis.off file:
+The program yields the foolowing results for the `Resources/Models/denis.off` file:
 
 The rasterized image:
 
