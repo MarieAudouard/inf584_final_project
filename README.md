@@ -34,6 +34,7 @@ Keyboard commands:
 -  SPACE: execute ray tracing (to avoid unless very low poly mesh).
 
 The image that is displayed when launching the program is the result of the rasterization.
+The console displays a message when changing the display mode, indicating what is the current display mode.
 
 ## Results
 
