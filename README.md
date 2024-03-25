@@ -7,9 +7,33 @@ In this project, I implemented the Horizon-Based Ambient Occlusion paper _Image-
 
 ## Installation
 
-The details about how to install and run the code are given in the README.md file in the code folder. The `<path-to-MyRenderer-directory>` should be the path to the `code` folder of this repository.
+The details about how to install the code are given in the README.md file in the code folder. The `<path-to-MyRenderer-directory>` should be the path to the `code` folder of this repository.
 
 I have observed that the ambient occlusion display did not work when my computer ran the program on the integrated GPU (Intel i7) but worked on my NVIDIA GPU. I did not attempt to solve this problem as it was not the goal of the project.
+
+## Running and using the project
+
+The details about how to install the code are given in the README.md file in the code folder. The `<path-to-MyRenderer-directory>` should be the path to the `code` folder of this repository.
+
+Once the project is launched, here are the possible actions:
+Mouse commands:
+
+-  Left button: rotate camera
+-  Middle button: zoom
+-  Right button: pan camera
+
+Keyboard commands:
+
+-  ESC: quit the program
+-  H: print the helper that also displays this information
+-  F12: reload GPU shaders
+-  F: decrease field of view
+-  G: increase field of view
+-  TAB: switch between rasterization, ray tracing, Zbuffer, normal display, Horizon-Based Ambient Occlusion (HBAO) and HBAO with rasterization
+-  S: switch between rasterization and rasterization + HBAO
+-  SPACE: execute ray tracing (to avoid unless very low poly mesh).
+
+The image that is displayed when launching the program is the result of the rasterization.
 
 ## Results
 
